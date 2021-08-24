@@ -427,6 +427,7 @@ dependencies = [
  "log",
  "mobc",
  "mobc-redis",
+ "once_cell",
  "pretty_env_logger",
  "teloxide",
  "thiserror",
