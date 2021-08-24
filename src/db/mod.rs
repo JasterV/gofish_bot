@@ -1,6 +1,8 @@
 use crate::alias::{MobcCon, MobcPool};
 use crate::errors::MobcError::*;
 use anyhow::Result;
+use async_once::AsyncOnce;
+use lazy_static::lazy_static;
 use mobc::Pool;
 use mobc_redis::redis::{AsyncCommands, FromRedisValue, ToRedisArgs};
 use mobc_redis::{redis, RedisConnectionManager};
@@ -10,6 +12,13 @@ pub const CACHE_POOL_MAX_OPEN: u64 = 16;
 pub const CACHE_POOL_MAX_IDLE: u64 = 8;
 pub const CACHE_POOL_TIMEOUT_SECONDS: u64 = 1;
 pub const CACHE_POOL_EXPIRE_SECONDS: u64 = 60;
+
+lazy_static! {
+    pub static ref POOL: AsyncOnce<MobcPool> = AsyncOnce::new(async {
+        let url = std::env::var("REDIS_URL").expect("REDIS_URL not found");
+        connect(&url).await.expect("Error connecting to redis")
+    });
+}
 
 pub async fn connect(url: &str) -> Result<MobcPool> {
     let client = redis::Client::open(url).map_err(RedisClientError)?;

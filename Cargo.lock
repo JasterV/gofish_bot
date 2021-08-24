@@ -35,6 +35,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "async_once"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58f8f7a882f8fffee0bdbb0580033b01613b50781e03c02713da0599ed90b595"
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -423,11 +429,12 @@ name = "gofish"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async_once",
  "dotenv",
+ "lazy_static",
  "log",
  "mobc",
  "mobc-redis",
- "once_cell",
  "pretty_env_logger",
  "teloxide",
  "thiserror",
