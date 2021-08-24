@@ -16,10 +16,12 @@ use teloxide::utils::command::BotCommand;
     parse_with = "split"
 )]
 pub enum Command {
-    #[command(description = "start a new game")]
+    #[command(description = "create a new game")]
     NewGame,
     #[command(description = "join the current game")]
     Join,
+    #[command(description = "start the game")]
+    Start,
     #[command(description = "end the game")]
     EndGame,
     #[command(description = "ask someone for cards")]

@@ -1,5 +1,6 @@
-newgame - start a new game
+newgame - create a new game
 join - join the game
+start - start the game
 endgame - stop the game
 ask - ask someone for cards
 status - ask the bot to show the game general status
