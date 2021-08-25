@@ -9,7 +9,7 @@ use teloxide::utils::command::BotCommand;
 // your commands in this format:
 // %GENERAL-DESCRIPTION%
 // %PREFIX%%COMMAND% - %DESCRIPTION%
-#[derive(BotCommand)]
+#[derive(BotCommand, Debug, Clone)]
 #[command(
     rename = "lowercase",
     description = "Use commands in format /command <arg1> <arg2> ... <argN> ",
