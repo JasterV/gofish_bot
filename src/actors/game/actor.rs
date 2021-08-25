@@ -1,9 +1,7 @@
 use anyhow::Result;
 
-use crate::{
-    actors::game::messages::Command,
-    models::{actor::Actor, game::Game},
-};
+use crate::models::actor::Actor;
+use crate::{actors::game::messages::Message, game::Game};
 
 pub struct GameActor {
     game: Game,
@@ -80,13 +78,10 @@ impl GameActor {
     // }
 }
 
-impl Actor<Command> for GameActor {
+impl Actor<Message> for GameActor {
     type Output = ();
 
-    fn handle(&mut self, command: Command) -> Result<Self::Output> {
-        let _ = match command {
-            _ => (),
-        };
+    fn handle(&mut self, Message(cx, command): Message) -> Result<Self::Output> {
         Ok(())
     }
 }

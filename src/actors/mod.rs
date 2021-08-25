@@ -1,7 +1,6 @@
 use crate::models::actor::{Actor, AsyncActor};
 use tokio::sync::mpsc::{self, Sender};
 
-pub mod cmd_processor;
 pub mod game;
 
 pub fn run_actor<T, E>(mut actor: E) -> Sender<T>

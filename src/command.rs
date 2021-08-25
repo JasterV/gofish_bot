@@ -25,7 +25,7 @@ pub enum Command {
     #[command(description = "end the game")]
     EndGame,
     #[command(description = "ask someone for cards")]
-    Ask,
+    Ask { to: usize, card: usize },
     #[command(description = "ask the bot to show the game general status")]
     Status,
     #[command(description = "ask the bot to send you your status")]

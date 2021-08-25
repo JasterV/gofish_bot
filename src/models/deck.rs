@@ -22,7 +22,8 @@ impl Deck {
         self.cards.shuffle(&mut rng);
     }
 
-    pub fn take(&mut self) -> Option<u8> {
-        self.cards.pop()
+    pub fn draw_n(&mut self, n: usize) -> Vec<u8> {
+        let len = self.cards.len();
+        self.cards.drain((len - n)..).collect()
     }
 }

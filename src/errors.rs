@@ -1,13 +1,15 @@
 use thiserror::Error;
 
-// #[derive(Error, Debug)]
-// pub enum MobcError {
-//     #[error("could not get redis connection from pool : {0}")]
-//     RedisPoolError(mobc::Error<mobc_redis::redis::RedisError>),
-//     #[error("error parsing string from redis result: {0}")]
-//     RedisTypeError(mobc_redis::redis::RedisError),
-//     #[error("error executing redis command: {0}")]
-//     RedisCMDError(mobc_redis::redis::RedisError),
-//     #[error("error creating Redis client: {0}")]
-//     RedisClientError(mobc_redis::redis::RedisError),
-// }
+#[derive(Error, Debug)]
+pub enum ActionError {
+    #[error("Player with number {0} does not exist")]
+    WrongPlayer(usize),
+    #[error("There is no card with the number {0}")]
+    WrongCard(u8),
+    #[error("There is no player with id {0}")]
+    InvalidPlayerId(String),
+    #[error("{0} can't ask for cards now")]
+    CannotTake(String),
+    #[error("{0} can't draw cards now")]
+    CannotDraw(String),
+}

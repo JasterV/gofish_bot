@@ -1,12 +1,3 @@
-use tokio::sync::oneshot::Sender as Responder;
+use crate::{alias::Cx, command::Command};
 
-#[derive(Debug)]
-pub enum Command {
-    Start,
-    Join(String),
-    // from, to, card, response
-    Ask(u8, u8, u8, Responder<String>),
-    // [(index, name)]
-    Players(Responder<Vec<(u8, String)>>),
-    Stop(Responder<(String, u8)>),
-}
+pub struct Message(pub Cx, pub Command);
