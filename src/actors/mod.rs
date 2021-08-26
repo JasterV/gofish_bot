@@ -1,4 +1,4 @@
-use crate::models::actor::{Actor, AsyncActor};
+use crate::entities::actor::{Actor, AsyncActor};
 use tokio::sync::mpsc::{self, Sender};
 
 pub mod game;

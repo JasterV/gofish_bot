@@ -1,14 +1,15 @@
+use super::messages::GameCommand;
+use crate::entities::actor::AsyncActor;
+use crate::{actors::game::messages::Message, entities::game::Game};
 use anyhow::Result;
-
-use crate::models::actor::Actor;
-use crate::{actors::game::messages::Message, game::Game};
+use async_trait::async_trait;
 
 pub struct GameActor {
     game: Game,
 }
 
 impl GameActor {
-    pub fn new(client_id: u16) -> Self {
+    pub fn new() -> Self {
         Self { game: Game::new() }
     }
 
@@ -78,10 +79,20 @@ impl GameActor {
     // }
 }
 
-impl Actor<Message> for GameActor {
+#[async_trait]
+impl AsyncActor<Message> for GameActor {
     type Output = ();
 
-    fn handle(&mut self, Message(cx, command): Message) -> Result<Self::Output> {
+    async fn handle(&mut self, Message(cx, command): Message) -> Result<Self::Output> {
+        let result = match command {
+            GameCommand::Ask(to, card) => {}
+            GameCommand::End => {}
+            GameCommand::Join => {}
+            GameCommand::Start => todo!(),
+            GameCommand::Status => todo!(),
+            GameCommand::MyStatus => todo!(),
+        };
+        // Check errors ocurred
         Ok(())
     }
 }

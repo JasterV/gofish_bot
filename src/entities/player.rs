@@ -1,19 +1,11 @@
 use serde::Serialize;
 
-#[derive(PartialEq, Serialize, Clone, Debug)]
-pub enum PlayerState {
-    Drawing,
-    Asking,
-    None,
-}
-
 #[derive(Serialize, Clone, Debug)]
 pub struct Player {
     pub id: String,
     pub name: String,
     pub cards: Vec<u8>,
     pub score: u8,
-    pub state: PlayerState,
 }
 
 impl Player {
@@ -31,6 +23,10 @@ impl Player {
             .map(|&e| e)
             .collect();
         removed
+    }
+
+    pub fn has_cards(&self) -> bool {
+        self.cards.len() > 0
     }
 
     pub fn add_cards(&mut self, cards: &[u8]) {

@@ -17,6 +17,10 @@ impl Deck {
         }
     }
 
+    pub fn valid_card(card: u8) -> bool {
+        card >= 1 && card <= 12
+    }
+
     pub fn shuffle(&mut self) {
         let mut rng = thread_rng();
         self.cards.shuffle(&mut rng);
