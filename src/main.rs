@@ -6,6 +6,7 @@ mod alias;
 mod command;
 mod entities;
 mod errors;
+mod templates;
 
 use std::sync::Arc;
 

@@ -1,9 +1,12 @@
 use super::messages::GameCommand;
+use crate::alias::Cx;
 use crate::entities::actor::AsyncActor;
+use crate::entities::game::Action;
+use crate::templates::*;
 use crate::{actors::game::messages::Message, entities::game::Game};
 use anyhow::Result;
 use async_trait::async_trait;
-
+use teloxide::prelude::*;
 pub struct GameActor {
     game: Game,
 }
@@ -13,70 +16,68 @@ impl GameActor {
         Self { game: Game::new() }
     }
 
-    // fn withdraw(&mut self, tx_id: u32, amount: f32) -> Result<()> {
-    //     self.account.withdraw(amount)?;
-    //     self.transactions.insert(
-    //         tx_id,
-    //         TransactionData {
-    //             ty: TransactionType::Withdrawal,
-    //             amount,
-    //             disputed: false,
-    //         },
-    //     );
-    //     Ok(())
-    // }
+    async fn start(&mut self, cx: Cx) -> Result<()> {
+        self.game.execute(Action::Start)?;
+        cx.answer(GAME_STARTED).await?;
+        self.send_status_to_players(cx).await?;
+        Ok(())
+    }
 
-    // fn deposit(&mut self, tx_id: u32, amount: f32) -> Result<()> {
-    //     self.account.deposit(amount)?;
-    //     self.transactions.insert(
-    //         tx_id,
-    //         TransactionData {
-    //             ty: TransactionType::Deposit,
-    //             amount,
-    //             disputed: false,
-    //         },
-    //     );
-    //     Ok(())
-    // }
+    async fn join(&mut self, cx: Cx) -> Result<()> {
+        let user = cx.update.from().unwrap();
 
-    // fn dispute(&mut self, tx_id: u32) -> Result<()> {
-    //     let client_id = self.account.get_client();
-    //     let tx = self
-    //         .transactions
-    //         .get_mut(&tx_id)
-    //         .ok_or(AccountError::TxNotFound(tx_id, client_id))?;
-    //     if tx.ty == TransactionType::Deposit && !tx.disputed {
-    //         self.account.held(tx.amount)?;
-    //         tx.disputed = true;
-    //     }
-    //     Ok(())
-    // }
+        self.game.execute(Action::Join(
+            user.id.clone().to_string(),
+            user.first_name.clone(),
+        ))?;
 
-    // fn resolve(&mut self, tx_id: u32) -> Result<()> {
-    //     let client_id = self.account.get_client();
-    //     let tx = self
-    //         .transactions
-    //         .get_mut(&tx_id)
-    //         .ok_or(AccountError::TxNotFound(tx_id, client_id))?;
-    //     if tx.disputed {
-    //         self.account.free(tx.amount)?;
-    //         tx.disputed = false;
-    //     }
-    //     Ok(())
-    // }
+        cx.answer(format!(
+            "Hi {}, welcome to Go Fish!",
+            user.first_name.clone()
+        ))
+        .await?;
 
-    // fn chargeback(&mut self, tx_id: u32) -> Result<()> {
-    //     let client_id = self.account.get_client();
-    //     let tx = self
-    //         .transactions
-    //         .get_mut(&tx_id)
-    //         .ok_or(AccountError::TxNotFound(tx_id, client_id))?;
-    //     if tx.disputed {
-    //         self.account.chargeback(tx.amount)?;
-    //         tx.disputed = false;
-    //     }
-    //     Ok(())
-    // }
+        Ok(())
+    }
+
+    async fn ask(&mut self, cx: Cx, to: usize, card: usize) -> Result<()> {
+        Ok(())
+    }
+
+    async fn status(&self, cx: Cx) -> Result<()> {
+        Ok(())
+    }
+
+    async fn my_status(&self, cx: Cx) -> Result<()> {
+        Ok(())
+    }
+
+    async fn end(&mut self, cx: Cx) -> Result<()> {
+        Ok(())
+    }
+
+    async fn send_status_to_players(&self, cx: Cx) -> Result<()> {
+        let bot = &cx.requester;
+        for player in &self.game.players {
+            bot.send_message(
+                player.id.clone(),
+                format!(
+                    "Hi {0}! Here is your status 😃:\n\tCards: {1}\n\tscore: {2}",
+                    player.name.clone(),
+                    player
+                        .cards
+                        .iter()
+                        .map(|e| e.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", "),
+                    player.score
+                ),
+            )
+            .send()
+            .await?;
+        }
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -85,12 +86,12 @@ impl AsyncActor<Message> for GameActor {
 
     async fn handle(&mut self, Message(cx, command): Message) -> Result<Self::Output> {
         let result = match command {
-            GameCommand::Ask(to, card) => {}
-            GameCommand::End => {}
-            GameCommand::Join => {}
-            GameCommand::Start => todo!(),
-            GameCommand::Status => todo!(),
-            GameCommand::MyStatus => todo!(),
+            GameCommand::Ask(to, card) => self.ask(cx, to, card).await,
+            GameCommand::End => self.end(cx).await,
+            GameCommand::Join => self.join(cx).await,
+            GameCommand::Start => self.start(cx).await,
+            GameCommand::Status => self.status(cx).await,
+            GameCommand::MyStatus => self.my_status(cx).await,
         };
         // Check errors ocurred
         Ok(())

@@ -232,7 +232,7 @@ impl Game {
     }
 
     fn is_valid_player_index(&self, to: usize) -> bool {
-        to >= 0 && to < self.players.len()
+        to < self.players.len()
     }
 
     fn shuffle_players(&mut self) {
