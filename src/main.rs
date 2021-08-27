@@ -18,9 +18,10 @@ use anyhow::Result;
 use command::Command;
 use dashmap::DashMap;
 use dotenv;
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 use teloxide::{prelude::*, types::Me, utils::command::BotCommand};
 use tokio::sync::{mpsc::Sender, oneshot};
+use url::Url;
 
 lazy_static! {
     static ref SENDERS: Arc<DashMap<i64, Sender<GameActorMsg>>> = Arc::new(DashMap::new());
@@ -35,10 +36,14 @@ async fn main() {
 
 async fn run() {
     log::info!("Starting bot...");
+    let webhook_url = std::env::var("WEBHOOK_URL").expect("WEBHOOK_URL not found");
     let bot = Bot::from_env().auto_send();
     let Me { user: bot_user, .. } = bot.get_me().await.unwrap();
     let bot_name = bot_user.username.expect("Bots must have usernames");
-
+    bot.set_webhook(Url::from_str(&webhook_url).expect("Invalid webhook url"))
+        .send()
+        .await
+        .unwrap();
     log::info!("listening...");
     teloxide::commands_repl(bot, bot_name, execute).await;
 }
