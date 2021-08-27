@@ -28,8 +28,6 @@ pub enum Command {
     Ask { to: usize, card: usize },
     #[command(description = "ask the bot to show the game general status")]
     Status,
-    #[command(description = "ask the bot to send you your status")]
-    MyStatus,
     #[command(description = "Show bot commands")]
     Help,
 }

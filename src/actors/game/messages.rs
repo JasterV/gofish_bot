@@ -5,7 +5,6 @@ pub enum GameCommand {
     Start,
     Join,
     Status,
-    MyStatus,
     Ask(usize, usize),
     End,
 }
@@ -18,7 +17,6 @@ impl From<Command> for GameCommand {
             Command::EndGame => GameCommand::End,
             Command::Ask { to, card } => GameCommand::Ask(to, card),
             Command::Status => GameCommand::Status,
-            Command::MyStatus => GameCommand::MyStatus,
             _ => panic!("Cannot convert Command to GameCommand"),
         }
     }

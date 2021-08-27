@@ -4,5 +4,4 @@ start - start the game
 endgame - stop the game
 ask - ask someone for cards
 status - ask the bot to show the game general status
-mystatus - ask the bot to send you your status
 help - display commands info

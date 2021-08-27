@@ -44,16 +44,15 @@ impl Player {
             .into_iter()
             .filter(|&c| counter[c as usize - 1] < 4)
             .collect();
-        let groups: Vec<u8> =
-            counter
-                .into_iter()
-                .enumerate()
-                .fold(vec![], |mut acc, (index, curr)| {
-                    if *curr >= 4 {
-                        acc.push((index as u8) + 1);
-                    }
-                    acc
-                });
+        let groups: Vec<u8> = counter
+            .iter()
+            .enumerate()
+            .fold(vec![], |mut acc, (index, curr)| {
+                if *curr >= 4 {
+                    acc.push((index as u8) + 1);
+                }
+                acc
+            });
         self.score += groups.len() as u8;
         groups
     }

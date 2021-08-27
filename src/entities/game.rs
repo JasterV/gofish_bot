@@ -5,7 +5,7 @@ use rand::seq::SliceRandom;
 use rand::thread_rng;
 use serde::Serialize;
 
-pub enum TurnEvents {
+pub enum TurnEvent {
     Started,
     Joined,
     // Group(card)
@@ -14,11 +14,7 @@ pub enum TurnEvents {
     Drawn(u8),
     // Took(quantity)
     Took(u8),
-    // GameOver(winners, score)
-    GameOver(Vec<String>, u8),
     DeckEmpty,
-    // NextTurn(username)
-    NextTurn(String),
 }
 
 pub enum Action {
@@ -32,10 +28,17 @@ pub enum Action {
 }
 
 #[derive(Serialize, PartialEq, Clone, Debug)]
+pub struct GameResults {
+    pub winners: Vec<String>,
+    pub score: u8,
+}
+
+#[derive(Serialize, PartialEq, Clone, Debug)]
 pub enum GameState {
     Waiting,
     Asking(usize),
     Drawing(usize),
+    GameOver(GameResults),
 }
 
 #[derive(Serialize, Debug)]
@@ -54,7 +57,7 @@ impl Game {
         }
     }
 
-    pub fn execute(&mut self, action: Action) -> Result<Vec<TurnEvents>> {
+    pub fn execute(&mut self, action: Action) -> Result<Vec<TurnEvent>> {
         let events = match action {
             Action::Start => self.start_game()?,
             Action::Join(id, name) => self.join_player(&id, &name)?,
@@ -64,7 +67,7 @@ impl Game {
         Ok(events)
     }
 
-    fn join_player(&mut self, player_id: &str, name: &str) -> Result<Vec<TurnEvents>> {
+    fn join_player(&mut self, player_id: &str, name: &str) -> Result<Vec<TurnEvent>> {
         if self.has_started() {
             return Err(GameAlreadyStarted.into());
         }
@@ -78,10 +81,10 @@ impl Game {
             name: name.into(),
             id: player_id.into(),
         });
-        Ok(vec![TurnEvents::Joined])
+        Ok(vec![TurnEvent::Joined])
     }
 
-    fn start_game(&mut self) -> Result<Vec<TurnEvents>> {
+    fn start_game(&mut self) -> Result<Vec<TurnEvent>> {
         if self.has_started() {
             return Err(GameAlreadyStarted.into());
         }
@@ -91,10 +94,10 @@ impl Game {
             player.cards.extend(self.deck.draw_n(7));
         }
         self.state = GameState::Asking(0);
-        return Ok(vec![TurnEvents::Started]);
+        return Ok(vec![TurnEvent::Started]);
     }
 
-    pub fn ask_to(&mut self, player_id: String, to: usize, card: u8) -> Result<Vec<TurnEvents>> {
+    pub fn ask_to(&mut self, player_id: String, to: usize, card: u8) -> Result<Vec<TurnEvent>> {
         let mut events = vec![];
         let index = self
             .get_player_index(&player_id)
@@ -106,7 +109,7 @@ impl Game {
             return Err(InvalidQuestion(to, card).into());
         }
         let cards = self.take_cards_from(to, card);
-        events.push(TurnEvents::Took(cards.len() as u8));
+        events.push(TurnEvent::Took(cards.len() as u8));
         let player = &mut self.players[index];
         // Set player state to drawing if no cards were taken
         if cards.len() > 0 {
@@ -114,25 +117,20 @@ impl Game {
             let groups = player.reduce_groups();
             // Group player cards
             for group in groups {
-                events.push(TurnEvents::Group(group))
+                events.push(TurnEvent::Group(group))
             }
         } else {
             self.state = GameState::Drawing(index);
         }
 
         if !player.has_cards() || !self.players[to].has_cards() {
-            let winners = self.get_winners();
-            events.push(TurnEvents::GameOver(
-                winners.iter().map(|p| p.name.clone()).collect(),
-                winners[0].score,
-            ));
-            self.end_game();
+            self.game_over();
         }
 
         Ok(events)
     }
 
-    pub fn draw_card(&mut self, player_id: String, chosen_card: u8) -> Result<Vec<TurnEvents>> {
+    pub fn draw_card(&mut self, player_id: String, chosen_card: u8) -> Result<Vec<TurnEvent>> {
         let mut events = vec![];
         let index = self
             .get_player_index(&player_id)
@@ -143,36 +141,26 @@ impl Game {
         let player = &mut self.players[index];
         let drawn = self.deck.draw_n(1);
         if drawn.len() == 0 {
-            events.push(TurnEvents::DeckEmpty);
+            events.push(TurnEvent::DeckEmpty);
         }
 
         if let Some(&card) = drawn.first() {
             player.add_cards(&drawn);
-            events.push(TurnEvents::Drawn(card));
+            events.push(TurnEvent::Drawn(card));
+            let groups = player.reduce_groups();
+            for card in groups {
+                events.push(TurnEvent::Group(card));
+            }
             if card != chosen_card {
                 self.end_turn();
-                events.push(TurnEvents::NextTurn(
-                    self.get_curr_player().unwrap().name.clone(),
-                ))
             } else {
-                let groups = player.reduce_groups();
-                for card in groups {
-                    events.push(TurnEvents::Group(card));
-                }
+                self.state = GameState::Asking(index);
                 if !player.has_cards() {
-                    let winners = self.get_winners();
-                    events.push(TurnEvents::GameOver(
-                        winners.iter().map(|p| p.name.clone()).collect(),
-                        winners[0].score,
-                    ));
-                    self.end_game();
+                    self.game_over();
                 }
             }
         } else {
             self.end_turn();
-            events.push(TurnEvents::NextTurn(
-                self.get_curr_player().unwrap().name.clone(),
-            ))
         }
 
         Ok(events)
@@ -187,9 +175,13 @@ impl Game {
         self.state = GameState::Asking(new_index);
     }
 
-    fn end_game(&mut self) {
+    fn game_over(&mut self) {
+        let winners = self.get_winners();
+        self.state = GameState::GameOver(GameResults {
+            winners: winners.iter().map(|p| p.name.clone()).collect(),
+            score: winners[0].score,
+        });
         self.deck = Deck::new();
-        self.state = GameState::Waiting;
         self.players = vec![]
     }
 
