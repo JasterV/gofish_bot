@@ -1,13 +1,15 @@
-use super::messages::GameCommand;
+use super::messages::{GameActorMsg, GameCommand, IsOver};
 use crate::alias::Cx;
 use crate::entities::actor::AsyncActor;
 use crate::entities::game::{Action, GameResults, GameState, TurnEvent};
 use crate::entities::player::Player;
+use crate::errors::ActionError;
 use crate::templates::*;
 use crate::{actors::game::messages::Message, entities::game::Game};
 use anyhow::Result;
 use async_trait::async_trait;
 use teloxide::prelude::*;
+
 pub struct GameActor {
     game: Game,
 }
@@ -17,8 +19,17 @@ impl GameActor {
         Self { game: Game::new() }
     }
 
+    pub fn is_over(&self) -> bool {
+        if let GameState::GameOver(_) = self.game.state {
+            true
+        } else {
+            false
+        }
+    }
+
     async fn start(&mut self, cx: &Cx) -> Result<()> {
         self.game.execute(Action::Start)?;
+        cx.answer_dice().await?;
         cx.answer(GAME_STARTED).await?;
         self.send_status_to_players(&cx, &self.game.players).await?;
         self.check_game_state(&cx).await
@@ -61,7 +72,6 @@ impl GameActor {
                             &self.game.players[to].name, quantity, card
                         ))
                         .await?;
-                        self.send_asking_data(cx, &from.first_name).await?;
                     }
                 }
                 TurnEvent::Group(card) => {
@@ -77,6 +87,7 @@ impl GameActor {
         if let GameState::Drawing(_) = self.game.state {
             self.draw(cx, card).await?;
         }
+        self.send_status_to_players(&cx, &self.game.players).await?;
         self.check_game_state(&cx).await
     }
 
@@ -115,10 +126,25 @@ impl GameActor {
     }
 
     async fn status(&self, cx: &Cx) -> Result<()> {
-        Ok(())
-    }
-
-    async fn end(&mut self, cx: &Cx) -> Result<()> {
+        let players_data: Vec<(String, u8, usize)> = self
+            .game
+            .players
+            .iter()
+            .map(|p| (p.name.clone(), p.score, p.cards.len()))
+            .collect();
+        cx.answer(format!(
+            "GAME STATUS:\n\nPlayers info:\n\n{}\nDeck remaining cards: {}",
+            players_data
+                .iter()
+                .map(|(name, score, cards_len)| format!(
+                    "{} => Score: {}, Cards: {}",
+                    name, score, cards_len
+                ))
+                .collect::<Vec<String>>()
+                .join("\n\t"),
+            self.game.deck.len()
+        ))
+        .await?;
         Ok(())
     }
 
@@ -189,18 +215,57 @@ impl GameActor {
 }
 
 #[async_trait]
-impl AsyncActor<Message> for GameActor {
+impl AsyncActor<GameActorMsg> for GameActor {
     type Output = ();
 
-    async fn handle(&mut self, Message(cx, command): Message) -> Result<Self::Output> {
+    async fn handle(&mut self, msg: GameActorMsg) -> Result<Self::Output> {
+        match msg {
+            GameActorMsg::Message(msg) => self.handle_message(msg).await,
+            GameActorMsg::IsOver(msg) => self.handle_is_over(msg).await,
+        }
+    }
+}
+
+impl GameActor {
+    async fn handle_is_over(&self, IsOver(responder): IsOver) -> Result<()> {
+        let _ = responder.send(self.is_over());
+        Ok(())
+    }
+
+    async fn handle_message(&mut self, Message(cx, command): Message) -> Result<()> {
         let result = match command {
             GameCommand::Ask(to, card) => self.ask(&cx, to, card).await,
-            GameCommand::End => self.end(&cx).await,
             GameCommand::Join => self.join(&cx).await,
             GameCommand::Start => self.start(&cx).await,
             GameCommand::Status => self.status(&cx).await,
         };
-        // Check errors ocurred
+
+        if let Err(root_err) = result {
+            match root_err.downcast_ref::<ActionError>() {
+                Some(err) => match err {
+                    ActionError::InvalidQuestion(_, _) => {
+                        cx.answer("Invalid question! Check if the option and the card provided are correct").await?;
+                    }
+                    ActionError::InvalidPlayerId(_) => {
+                        cx.answer("Sorry you can't ask you are not playing!")
+                            .await?;
+                    }
+                    ActionError::CannotAsk(_) => {
+                        cx.answer("Hey is not your turn! You can't ask!").await?;
+                    }
+                    ActionError::CannotDraw(_) => {
+                        cx.answer("Error drawing :(").await?;
+                    }
+                    ActionError::GameAlreadyStarted => {
+                        cx.answer("The game has already started!").await?;
+                    }
+                    ActionError::PlayerAlreadyJoined(_) => {
+                        cx.answer("You have already joined!").await?;
+                    }
+                },
+                None => {}
+            }
+        }
         Ok(())
     }
 }

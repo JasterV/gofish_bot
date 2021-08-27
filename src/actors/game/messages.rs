@@ -1,4 +1,5 @@
 use crate::{alias::Cx, command::Command};
+use tokio::sync::oneshot::Sender as Responder;
 
 #[derive(Debug)]
 pub enum GameCommand {
@@ -6,7 +7,6 @@ pub enum GameCommand {
     Join,
     Status,
     Ask(usize, usize),
-    End,
 }
 
 impl From<Command> for GameCommand {
@@ -14,7 +14,6 @@ impl From<Command> for GameCommand {
         match cmd {
             Command::Join => GameCommand::Join,
             Command::Start => GameCommand::Start,
-            Command::EndGame => GameCommand::End,
             Command::Ask { to, card } => GameCommand::Ask(to, card),
             Command::Status => GameCommand::Status,
             _ => panic!("Cannot convert Command to GameCommand"),
@@ -22,4 +21,10 @@ impl From<Command> for GameCommand {
     }
 }
 
+pub struct IsOver(pub Responder<bool>);
 pub struct Message(pub Cx, pub GameCommand);
+
+pub enum GameActorMsg {
+    Message(Message),
+    IsOver(IsOver),
+}

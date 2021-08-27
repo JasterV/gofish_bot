@@ -8,20 +8,22 @@ mod entities;
 mod errors;
 mod templates;
 
-use std::sync::Arc;
-
 use crate::actors::run_async_actor;
-use actors::game::{actor::GameActor, messages::Message};
+use actors::game::{
+    actor::GameActor,
+    messages::{GameActorMsg, IsOver, Message},
+};
 use alias::Cx;
 use anyhow::Result;
 use command::Command;
 use dashmap::DashMap;
 use dotenv;
-use teloxide::{prelude::*, types::Me};
-use tokio::sync::mpsc::Sender;
+use std::sync::Arc;
+use teloxide::{prelude::*, types::Me, utils::command::BotCommand};
+use tokio::sync::{mpsc::Sender, oneshot};
 
 lazy_static! {
-    static ref SENDERS: Arc<DashMap<i64, Sender<Message>>> = Arc::new(DashMap::new());
+    static ref SENDERS: Arc<DashMap<i64, Sender<GameActorMsg>>> = Arc::new(DashMap::new());
 }
 
 #[tokio::main]
@@ -45,24 +47,39 @@ async fn execute(cx: Cx, command: Command) -> Result<()> {
     let chat_id = cx.chat_id();
 
     match command {
+        Command::Help => {
+            cx.answer(Command::descriptions()).await?;
+        }
         Command::NewGame => {
             SENDERS.entry(chat_id).or_insert_with(|| {
-                let addr: Sender<Message> = run_async_actor(GameActor::new());
+                let addr: Sender<GameActorMsg> = run_async_actor(GameActor::new());
                 addr
             });
+            cx.answer("Game created! Start joining and send start to start fishing")
+                .await?;
         }
         Command::EndGame => {
-            let entry = SENDERS.remove(&chat_id);
-            if let Some(entry) = entry {
-                let _ = entry.1.send(Message(cx, command.into())).await;
+            if let Some(_) = SENDERS.remove(&chat_id) {
+                cx.answer("The game has end!").await?;
+            } else {
+                cx.answer("There is not game in progress").await?;
             }
         }
         _ => {
             let entry = SENDERS.get(&chat_id);
             if let Some(entry) = entry {
-                let _ = entry.value().send(Message(cx, command.into())).await;
+                let sender = entry.value();
+                let _ = sender
+                    .send(GameActorMsg::Message(Message(cx, command.into())))
+                    .await;
+                let (tx, rx) = oneshot::channel();
+                let _ = sender.send(GameActorMsg::IsOver(IsOver(tx))).await;
+                let is_over = rx.await?;
+                if is_over {
+                    SENDERS.remove(&chat_id);
+                }
             } else {
-                cx.answer("The game has not started yet!");
+                cx.answer("The game has not been created yet!").await?;
             }
         }
     }

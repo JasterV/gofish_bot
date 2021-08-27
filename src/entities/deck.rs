@@ -17,6 +17,10 @@ impl Deck {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.cards.len()
+    }
+
     pub fn valid_card(card: u8) -> bool {
         card >= 1 && card <= 12
     }

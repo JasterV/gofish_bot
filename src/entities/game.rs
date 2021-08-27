@@ -203,20 +203,12 @@ impl Game {
         taken
     }
 
-    fn get_curr_player(&self) -> Option<&Player> {
-        match self.state {
-            GameState::Drawing(index) => Some(&self.players[index]),
-            GameState::Asking(index) => Some(&self.players[index]),
-            _ => None,
-        }
-    }
-
     fn can_draw(&self, index: usize) -> bool {
-        self.state == GameState::Asking(index)
+        self.state == GameState::Drawing(index)
     }
 
     fn can_ask(&self, index: usize) -> bool {
-        self.state == GameState::Drawing(index)
+        self.state == GameState::Asking(index)
     }
 
     fn is_valid_question(&self, to: usize, card: u8) -> bool {
