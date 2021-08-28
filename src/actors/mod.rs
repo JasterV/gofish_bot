@@ -1,7 +1,15 @@
-use crate::entities::actor::AsyncActor;
+pub mod game;
+
+use anyhow::Result;
+use async_trait::async_trait;
 use tokio::sync::mpsc::{self, Sender};
 
-pub mod game;
+#[async_trait]
+pub trait AsyncActor<T> {
+    type Output;
+
+    async fn handle(&mut self, cmd: T) -> Result<Self::Output>;
+}
 
 pub fn run_async_actor<T, E>(mut actor: E) -> Sender<T>
 where

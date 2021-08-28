@@ -1,6 +1,6 @@
 use super::messages::{GameActorMsg, GameCommand, IsOver};
+use crate::actors::AsyncActor;
 use crate::alias::Cx;
-use crate::entities::actor::AsyncActor;
 use crate::entities::game::{Action, GameResults, GameState, TurnEvent};
 use crate::entities::player::Player;
 use crate::errors::ActionError;
