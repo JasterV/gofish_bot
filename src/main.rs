@@ -7,6 +7,7 @@ mod command;
 mod entities;
 mod errors;
 mod templates;
+mod webhook;
 
 use crate::actors::run_async_actor;
 use actors::game::{
@@ -18,10 +19,10 @@ use anyhow::Result;
 use command::Command;
 use dashmap::DashMap;
 use dotenv;
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 use teloxide::{prelude::*, types::Me, utils::command::BotCommand};
 use tokio::sync::{mpsc::Sender, oneshot};
-use url::Url;
+use webhook::webhook;
 
 lazy_static! {
     static ref SENDERS: Arc<DashMap<i64, Sender<GameActorMsg>>> = Arc::new(DashMap::new());
@@ -29,23 +30,19 @@ lazy_static! {
 
 #[tokio::main]
 async fn main() {
-    dotenv::dotenv().ok();
-    teloxide::enable_logging!();
     run().await;
 }
 
 async fn run() {
+    dotenv::dotenv().ok();
+    teloxide::enable_logging!();
     log::info!("Starting bot...");
-    let webhook_url = std::env::var("WEBHOOK_URL").expect("WEBHOOK_URL not found");
     let bot = Bot::from_env().auto_send();
     let Me { user: bot_user, .. } = bot.get_me().await.unwrap();
     let bot_name = bot_user.username.expect("Bots must have usernames");
-    bot.set_webhook(Url::from_str(&webhook_url).expect("Invalid webhook url"))
-        .send()
-        .await
-        .unwrap();
     log::info!("listening...");
-    teloxide::commands_repl(bot, bot_name, execute).await;
+    let cloned_bot = bot.clone();
+    teloxide::commands_repl_with_listener(bot, bot_name, execute, webhook(cloned_bot).await).await
 }
 
 async fn execute(cx: Cx, command: Command) -> Result<()> {

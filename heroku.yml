@@ -1,7 +1,0 @@
-build:
-  docker:
-    web:
-       dockerfile: Dockerfile
-       target: production
-run:
-  web: ./gofish
