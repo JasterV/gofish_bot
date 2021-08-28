@@ -64,7 +64,7 @@ async fn execute(cx: Cx, command: Command) -> Result<()> {
             if let Some(_) = SENDERS.remove(&chat_id) {
                 cx.answer("The game has end!").await?;
             } else {
-                cx.answer("There is not game in progress").await?;
+                cx.answer("There is no game in progress").await?;
             }
         }
         _ => {
