@@ -105,7 +105,7 @@ impl Game {
         if !self.can_ask(index) {
             return Err(CannotAsk(player_id.clone()).into());
         }
-        if !self.is_valid_question(to, card) {
+        if !self.is_valid_question(index, to, card) {
             return Err(InvalidQuestion(to, card).into());
         }
         let cards = self.take_cards_from(to, card);
@@ -211,8 +211,10 @@ impl Game {
         self.state == GameState::Asking(index)
     }
 
-    fn is_valid_question(&self, to: usize, card: u8) -> bool {
-        self.is_valid_player_index(to) && Deck::valid_card(card)
+    fn is_valid_question(&self, from: usize, to: usize, card: u8) -> bool {
+        self.is_valid_player_index(to)
+            && Deck::valid_card(card)
+            && self.players[from].cards.iter().any(|&c| c == card)
     }
 
     fn is_valid_player_index(&self, to: usize) -> bool {
