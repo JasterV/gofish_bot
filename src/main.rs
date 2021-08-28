@@ -21,6 +21,7 @@ use dashmap::DashMap;
 use dotenv;
 use std::sync::Arc;
 use teloxide::{prelude::*, types::Me, utils::command::BotCommand};
+use templates::*;
 use tokio::sync::{mpsc::Sender, oneshot};
 use webhook::webhook;
 
@@ -57,14 +58,13 @@ async fn execute(cx: Cx, command: Command) -> Result<()> {
                 let addr: Sender<GameActorMsg> = run_async_actor(GameActor::new());
                 addr
             });
-            cx.answer("Game created! Start joining and send start to start fishing")
-                .await?;
+            cx.answer(GAME_CREATED).await?;
         }
         Command::EndGame => {
             if let Some(_) = SENDERS.remove(&chat_id) {
-                cx.answer("The game has end!").await?;
+                cx.answer(GAME_FINISHED).await?;
             } else {
-                cx.answer("There is no game in progress").await?;
+                cx.answer(NO_GAME_IN_PROGRESS).await?;
             }
         }
         _ => {
@@ -81,7 +81,7 @@ async fn execute(cx: Cx, command: Command) -> Result<()> {
                     SENDERS.remove(&chat_id);
                 }
             } else {
-                cx.answer("The game has not been created yet!").await?;
+                cx.answer(NO_GAME_CREATED).await?;
             }
         }
     }

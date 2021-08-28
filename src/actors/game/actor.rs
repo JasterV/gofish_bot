@@ -14,6 +14,63 @@ pub struct GameActor {
     game: Game,
 }
 
+#[async_trait]
+impl AsyncActor<GameActorMsg> for GameActor {
+    type Output = ();
+
+    async fn handle(&mut self, msg: GameActorMsg) -> Result<Self::Output> {
+        match msg {
+            GameActorMsg::Message(msg) => self.handle_message(msg).await,
+            GameActorMsg::IsOver(msg) => self.handle_is_over(msg).await,
+        }
+    }
+}
+
+impl GameActor {
+    async fn handle_is_over(&self, IsOver(responder): IsOver) -> Result<()> {
+        let _ = responder.send(self.is_over());
+        Ok(())
+    }
+
+    async fn handle_message(&mut self, Message(cx, command): Message) -> Result<()> {
+        let result = match command {
+            GameCommand::Ask(to, card) => self.ask(&cx, to, card).await,
+            GameCommand::Join => self.join(&cx).await,
+            GameCommand::Start => self.start(&cx).await,
+            GameCommand::Status => self.status(&cx).await,
+        };
+
+        if let Err(root_err) = result {
+            match root_err.downcast_ref::<ActionError>() {
+                Some(err) => match err {
+                    ActionError::InvalidQuestion(_, _) => {
+                        cx.answer(INVALID_QUESTION).await?;
+                    }
+                    ActionError::InvalidPlayerId(_) => {
+                        cx.answer(INVALID_PLAYER).await?;
+                    }
+                    ActionError::CannotAsk(_) => {
+                        cx.answer(NOT_YOUR_TURN).await?;
+                    }
+                    ActionError::CannotDraw(_) => {
+                        cx.answer(ERROR_DRAWING).await?;
+                    }
+                    ActionError::GameAlreadyStarted => {
+                        cx.answer(GAME_ALREADY_STARTED).await?;
+                    }
+                    ActionError::PlayerAlreadyJoined(_) => {
+                        cx.answer(ALREADY_JOINED).await?;
+                    }
+                },
+                None => {
+                    cx.answer(UNKNOWN_ERROR).await?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 impl GameActor {
     pub fn new() -> Self {
         Self { game: Game::new() }
@@ -61,25 +118,14 @@ impl GameActor {
             match event {
                 TurnEvent::Took(quantity) => {
                     if quantity == 0 {
-                        cx.answer(format!(
-                            "{} had no cards with that number, lets draw!",
-                            &self.game.players[to].name
-                        ))
-                        .await?;
+                        cx.answer(no_cards(&self.game.players[to].name)).await?;
                     } else {
-                        cx.answer(format!(
-                            "{} had {} cards with the number {}, keep asking!",
-                            &self.game.players[to].name, quantity, card
-                        ))
-                        .await?;
+                        cx.answer(had_n_cards(&self.game.players[to].name, quantity, card))
+                            .await?;
                     }
                 }
                 TurnEvent::Group(card) => {
-                    cx.answer(format!(
-                        "{} has made a group of four {}",
-                        from.first_name, card
-                    ))
-                    .await?;
+                    cx.answer(made_group(&from.first_name, card)).await?;
                 }
                 _ => {}
             }
@@ -99,25 +145,17 @@ impl GameActor {
         for event in events {
             match event {
                 TurnEvent::Drawn(drawn) => {
-                    cx.answer(format!("{} has drawn a card", &from.first_name))
-                        .await?;
+                    cx.answer(drawn_card(&from.first_name)).await?;
                     if drawn == (card as u8) {
-                        cx.answer(format!(
-                            "{} has drawn a {}!! Keep asking!",
-                            &from.first_name, card
-                        ))
-                        .await?;
+                        cx.answer(drawn_expected_card(&from.first_name, drawn))
+                            .await?;
                     }
                 }
                 TurnEvent::DeckEmpty => {
-                    cx.answer("The deck is empty!!!").await?;
+                    cx.answer(EMPTY_DECK).await?;
                 }
                 TurnEvent::Group(card) => {
-                    cx.answer(format!(
-                        "{} has made a group of four {}",
-                        from.first_name, card
-                    ))
-                    .await?;
+                    cx.answer(made_group(&from.first_name, card)).await?;
                 }
                 _ => {}
             }
@@ -126,145 +164,34 @@ impl GameActor {
     }
 
     async fn status(&self, cx: &Cx) -> Result<()> {
-        let players_data: Vec<(String, u8, usize)> = self
-            .game
-            .players
-            .iter()
-            .map(|p| (p.name.clone(), p.score, p.cards.len()))
-            .collect();
-        cx.answer(format!(
-            "GAME STATUS:\n\nPlayers info:\n\n{}\nDeck remaining cards: {}",
-            players_data
-                .iter()
-                .map(|(name, score, cards_len)| format!(
-                    "{} => Score: {}, Cards: {}",
-                    name, score, cards_len
-                ))
-                .collect::<Vec<String>>()
-                .join("\n\t"),
-            self.game.deck.len()
-        ))
-        .await?;
+        cx.answer(game_status(&self.game.players, self.game.deck.len()))
+            .await?;
         Ok(())
     }
 
     async fn check_game_state(&self, cx: &Cx) -> Result<()> {
         match &self.game.state {
-            GameState::Waiting => Ok(()),
-            GameState::Drawing(_) => Ok(()),
             GameState::Asking(index) => {
-                self.send_asking_data(&cx, &self.game.players[*index].name)
-                    .await
+                cx.answer(ask_for_cards(
+                    &self.game.players[*index].name,
+                    &self.game.players,
+                ))
+                .await?;
             }
             GameState::GameOver(GameResults { winners, score }) => {
-                self.send_game_over(&cx, winners, *score).await
+                cx.answer(game_over(winners, *score)).await?;
             }
+            _ => {}
         }
-    }
-
-    async fn send_game_over(&self, cx: &Cx, winners: &[String], score: u8) -> Result<()> {
-        cx.answer(format!(
-            "Game Over!\n\tWinners 👑: {}\n\tScore: {}",
-            winners.join(", "),
-            score
-        ))
-        .await?;
-        Ok(())
-    }
-
-    async fn send_asking_data(&self, cx: &Cx, name: &str) -> Result<()> {
-        let players_data: Vec<(usize, String)> = self
-            .game
-            .players
-            .iter()
-            .enumerate()
-            .map(|(index, player)| (index, player.name.clone()))
-            .collect();
-        cx.answer(
-            format!(
-                "{} lets ask someone for a card😇:\n\nType '/ask <option> <card> with one of the following options:\n\n{}'",
-                name,
-                players_data.iter().map(|(index, name)| format!("{}) {}", index, name)).collect::<Vec<String>>().join("\n")
-            )
-        ).await?;
         Ok(())
     }
 
     async fn send_status_to_players(&self, cx: &Cx, players: &[Player]) -> Result<()> {
         let bot = &cx.requester;
         for player in players {
-            bot.send_message(
-                player.id.clone(),
-                format!(
-                    "Hi {0}! Here is your status 😃:\n\tCards: {1}\n\tscore: {2}",
-                    player.name.clone(),
-                    player
-                        .cards
-                        .iter()
-                        .map(|e| e.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", "),
-                    player.score
-                ),
-            )
-            .send()
-            .await?;
-        }
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl AsyncActor<GameActorMsg> for GameActor {
-    type Output = ();
-
-    async fn handle(&mut self, msg: GameActorMsg) -> Result<Self::Output> {
-        match msg {
-            GameActorMsg::Message(msg) => self.handle_message(msg).await,
-            GameActorMsg::IsOver(msg) => self.handle_is_over(msg).await,
-        }
-    }
-}
-
-impl GameActor {
-    async fn handle_is_over(&self, IsOver(responder): IsOver) -> Result<()> {
-        let _ = responder.send(self.is_over());
-        Ok(())
-    }
-
-    async fn handle_message(&mut self, Message(cx, command): Message) -> Result<()> {
-        let result = match command {
-            GameCommand::Ask(to, card) => self.ask(&cx, to, card).await,
-            GameCommand::Join => self.join(&cx).await,
-            GameCommand::Start => self.start(&cx).await,
-            GameCommand::Status => self.status(&cx).await,
-        };
-
-        if let Err(root_err) = result {
-            match root_err.downcast_ref::<ActionError>() {
-                Some(err) => match err {
-                    ActionError::InvalidQuestion(_, _) => {
-                        cx.answer("Invalid question! Check if the option and the card provided are correct").await?;
-                    }
-                    ActionError::InvalidPlayerId(_) => {
-                        cx.answer("Sorry you can't ask you are not playing!")
-                            .await?;
-                    }
-                    ActionError::CannotAsk(_) => {
-                        cx.answer("Hey is not your turn! You can't ask!").await?;
-                    }
-                    ActionError::CannotDraw(_) => {
-                        cx.answer("Error drawing :(").await?;
-                    }
-                    ActionError::GameAlreadyStarted => {
-                        cx.answer("The game has already started!").await?;
-                    }
-                    ActionError::PlayerAlreadyJoined(_) => {
-                        cx.answer("You have already joined!").await?;
-                    }
-                },
-                None => {}
-            }
+            bot.send_message(player.id.clone(), player_status(player))
+                .send()
+                .await?;
         }
         Ok(())
     }
