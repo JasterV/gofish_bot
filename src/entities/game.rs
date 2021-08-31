@@ -57,6 +57,10 @@ impl Game {
         }
     }
 
+    pub fn get_player_by_id(&self, id: &str) -> Option<&Player> {
+        self.players.iter().find(|p| p.id == id)
+    }
+
     pub fn execute(&mut self, action: Action) -> Result<Vec<TurnEvent>> {
         let events = match action {
             Action::Start => self.start_game()?,

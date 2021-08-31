@@ -41,31 +41,18 @@ impl GameActor {
         };
 
         if let Err(root_err) = result {
-            match root_err.downcast_ref::<ActionError>() {
+            let message = match root_err.downcast_ref::<ActionError>() {
                 Some(err) => match err {
-                    ActionError::InvalidQuestion(_, _) => {
-                        cx.answer(INVALID_QUESTION).await?;
-                    }
-                    ActionError::InvalidPlayerId(_) => {
-                        cx.answer(INVALID_PLAYER).await?;
-                    }
-                    ActionError::CannotAsk(_) => {
-                        cx.answer(NOT_YOUR_TURN).await?;
-                    }
-                    ActionError::CannotDraw(_) => {
-                        cx.answer(ERROR_DRAWING).await?;
-                    }
-                    ActionError::GameAlreadyStarted => {
-                        cx.answer(GAME_ALREADY_STARTED).await?;
-                    }
-                    ActionError::PlayerAlreadyJoined(_) => {
-                        cx.answer(ALREADY_JOINED).await?;
-                    }
+                    ActionError::InvalidQuestion(_, _) => INVALID_QUESTION,
+                    ActionError::InvalidPlayerId(_) => INVALID_PLAYER,
+                    ActionError::CannotAsk(_) => NOT_YOUR_TURN,
+                    ActionError::CannotDraw(_) => ERROR_DRAWING,
+                    ActionError::GameAlreadyStarted => GAME_ALREADY_STARTED,
+                    ActionError::PlayerAlreadyJoined(_) => ALREADY_JOINED,
                 },
-                None => {
-                    cx.answer(UNKNOWN_ERROR).await?;
-                }
-            }
+                None => UNKNOWN_ERROR,
+            };
+            cx.answer(message).await?;
         }
         Ok(())
     }
@@ -111,29 +98,36 @@ impl GameActor {
 
     async fn ask(&mut self, cx: &Cx, to: usize, card: usize) -> Result<()> {
         let from = cx.update.from().unwrap();
+        let player_id = format!("{}", from.id);
         let events = self
             .game
-            .execute(Action::Ask(format!("{}", from.id), to, card as u8))?;
+            .execute(Action::Ask(player_id.clone(), to, card as u8))?;
         for event in events {
-            match event {
+            let msg = match event {
+                TurnEvent::Took(quantity) if quantity == 0 => {
+                    Some(no_cards(&self.game.players[to].name))
+                }
                 TurnEvent::Took(quantity) => {
-                    if quantity == 0 {
-                        cx.answer(no_cards(&self.game.players[to].name)).await?;
-                    } else {
-                        cx.answer(had_n_cards(&self.game.players[to].name, quantity, card))
-                            .await?;
-                    }
+                    Some(had_n_cards(&self.game.players[to].name, quantity, card))
                 }
-                TurnEvent::Group(card) => {
-                    cx.answer(made_group(&from.first_name, card)).await?;
-                }
-                _ => {}
+                TurnEvent::Group(card) => Some(made_group(&from.first_name, card)),
+                _ => None,
+            };
+            if let Some(msg) = msg {
+                cx.answer(msg).await?;
             }
         }
         if let GameState::Drawing(_) = self.game.state {
             self.draw(cx, card).await?;
         }
-        self.send_status_to_players(&cx, &self.game.players).await?;
+        self.send_status_to_players(
+            &cx,
+            &vec![
+                self.game.players[to].clone(),
+                self.game.get_player_by_id(&player_id).unwrap().clone(),
+            ],
+        )
+        .await?;
         self.check_game_state(&cx).await
     }
 
