@@ -31,7 +31,14 @@ impl Deck {
     }
 
     pub fn draw_n(&mut self, n: usize) -> Vec<u8> {
-        let len = self.cards.len();
-        self.cards.drain((len - n)..).collect()
+        let mut result = vec![];
+        for _ in 0..n {
+            let elem = self.cards.pop();
+            if let None = elem {
+                break;
+            }
+            result.push(elem.unwrap());
+        }
+        result
     }
 }
