@@ -185,8 +185,6 @@ impl Game {
             winners: winners.iter().map(|p| p.name.clone()).collect(),
             score: winners[0].score,
         });
-        self.deck = Deck::new();
-        self.players = vec![]
     }
 
     fn has_started(&self) -> bool {

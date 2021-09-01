@@ -64,10 +64,9 @@ impl GameActor {
     }
 
     pub fn is_over(&self) -> bool {
-        if let GameState::GameOver(_) = self.game.state {
-            true
-        } else {
-            false
+        match self.game.state {
+            GameState::GameOver(_) => true,
+            _ => false,
         }
     }
 
@@ -81,18 +80,11 @@ impl GameActor {
 
     async fn join(&mut self, cx: &Cx) -> Result<()> {
         let user = cx.update.from().unwrap();
-
         self.game.execute(Action::Join(
             user.id.clone().to_string(),
             user.first_name.clone(),
         ))?;
-
-        cx.answer(format!(
-            "Hi {}, welcome to Go Fish!",
-            user.first_name.clone()
-        ))
-        .await?;
-
+        cx.answer(welcome(&user.first_name)).await?;
         Ok(())
     }
 
@@ -137,21 +129,17 @@ impl GameActor {
             .game
             .execute(Action::Draw(format!("{}", from.id), card as u8))?;
         for event in events {
-            match event {
-                TurnEvent::Drawn(drawn) => {
-                    cx.answer(drawn_card(&from.first_name)).await?;
-                    if drawn == (card as u8) {
-                        cx.answer(drawn_expected_card(&from.first_name, drawn))
-                            .await?;
-                    }
+            let msg = match event {
+                TurnEvent::Drawn(drawn) if drawn == (card as u8) => {
+                    Some(drawn_expected_card(&from.first_name, drawn))
                 }
-                TurnEvent::DeckEmpty => {
-                    cx.answer(EMPTY_DECK).await?;
-                }
-                TurnEvent::Group(card) => {
-                    cx.answer(made_group(&from.first_name, card)).await?;
-                }
-                _ => {}
+                TurnEvent::Drawn(_) => Some(drawn_card(&from.first_name)),
+                TurnEvent::DeckEmpty => Some(EMPTY_DECK.into()),
+                TurnEvent::Group(card) => Some(made_group(&from.first_name, card)),
+                _ => None,
+            };
+            if let Some(msg) = msg {
+                cx.answer(msg).await?;
             }
         }
         Ok(())

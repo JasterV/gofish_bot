@@ -16,6 +16,10 @@ pub const ALREADY_JOINED: &'static str = "You have already joined!";
 pub const EMPTY_DECK: &'static str = "The deck is empty!!!";
 pub const UNKNOWN_ERROR: &'static str = "An error sending a message occurred!\n\nMake sure that all game participants have started the bot on their private chats to receive your cards!!\n\nOtherwise, open an issue to: https://github.com/JasterV/gofish_bot";
 
+pub fn welcome(name: &str) -> String {
+    format!("Hi {}, welcome to Go Fish!", name)
+}
+
 pub fn no_cards(name: &str) -> String {
     format!("{} had no cards with that number, lets draw!", name)
 }
