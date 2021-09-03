@@ -68,9 +68,8 @@ async fn execute(cx: Cx, command: Command) -> Result<()> {
             }
         }
         _ => {
-            let entry = SENDERS.get(&chat_id);
-            if let Some(entry) = entry {
-                let sender = entry.value();
+            let sender = get_sender(chat_id);
+            if let Some(sender) = sender {
                 let _ = sender
                     .send(GameActorMsg::Message(Message(cx, command.into())))
                     .await;
@@ -86,4 +85,12 @@ async fn execute(cx: Cx, command: Command) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn get_sender(chat_id: i64) -> Option<Sender<GameActorMsg>> {
+    let entry = SENDERS.get(&chat_id);
+    match entry {
+        Some(entry) => Some(entry.clone()),
+        _ => None,
+    }
 }
